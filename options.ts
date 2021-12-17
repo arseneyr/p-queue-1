@@ -69,4 +69,9 @@ export interface DefaultAddOptions extends QueueAddOptions {
 	@default 0
 	*/
     readonly priority?: number
+
+	/**
+	AbortSignal instance that will remove this task on abort.
+	*/
+	readonly signal?: AbortSignal
 }

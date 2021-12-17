@@ -14,6 +14,9 @@ const empty = (): void => { }
 
 const timeoutError = new TimeoutError()
 
+const abortError = new Error('Task aborted');
+abortError.name = "AbortError";
+
 /**
 Promise queue with concurrency control.
 */
@@ -275,11 +278,15 @@ export default class PQueue<
         options: Partial<EnqueueOptionsType> = {},
     ): Promise<TaskResultType> {
         return new Promise<TaskResultType>((resolve, reject) => {
+            const signal = options.signal as AbortSignal ?? undefined
             const run = async (): Promise<void> => {
                 this._pendingCount++
                 this._intervalCount++
 
                 try {
+                    if (signal?.aborted) {
+                        throw abortError
+                    }
                     const operation = (this._timeout === undefined && options.timeout === undefined) ? fn() : pTimeout({
                         promise: Promise.resolve(fn()),
                         milliseconds: (options.timeout === undefined ? this._timeout : options.timeout) as number,
@@ -299,6 +306,17 @@ export default class PQueue<
                 }
 
                 this._next()
+            }
+
+            if (signal !== undefined) {
+                if (signal.aborted) {
+                    reject(abortError)
+                    return
+                }
+
+                signal.addEventListener('abort', () => {
+                    reject(abortError)
+                })
             }
 
             this._queue.enqueue(run, options)
